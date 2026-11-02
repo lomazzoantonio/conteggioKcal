@@ -1,0 +1,18 @@
+{
+  "name": "Deficit calorico",
+  "short_name": "Deficit",
+  "description": "Diario di cibi e kcal consumate per arrivare a 31.000 kcal di deficit.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "it",
+  "background_color": "#EEF2EF",
+  "theme_color": "#173038",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

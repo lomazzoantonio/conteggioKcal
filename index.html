@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#173038">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Deficit">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Deficit calorico</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@property --f { syntax: '<number>'; inherits: false; initial-value: 0; }
+
+@font-face {
+  font-family: 'Archivo';
+  src: url('fonts/archivo.woff2') format('woff2');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+}
+
+:root {
+  --paper: #EEF2EF;
+  --surface: #FAFBFA;
+  --ink: #15242B;
+  --muted: #56676D;
+  --rule: #CBD5D1;
+  --band: #173038;
+  --band-ink: #EAF3F0;
+  --band-muted: #A3BDB8;
+  --band-fill: #5FE0BC;
+  --band-empty: rgba(234, 243, 240, .14);
+  --def: #0A6F5A;
+  --def-soft: #D2EAE2;
+  --sur: #AD2250;
+  --sur-soft: #F5D9E2;
+  --pen: #7E5D00;
+  --pen-mark: #D49C12;
+  --pen-soft: #F6EBC9;
+  --focus: #2F6FD6;
+  --toast-accent: #5FE0BC;
+  --r: 10px;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0F1A1E;
+    --surface: #16232A;
+    --ink: #E4EDEA;
+    --muted: #97AAAE;
+    --rule: #2A3B42;
+    --def: #4FD1AE;
+    --def-soft: #143A33;
+    --sur: #F17AA0;
+    --sur-soft: #47202E;
+    --pen: #E7B94A;
+    --pen-mark: #E7B94A;
+    --pen-soft: #3A3119;
+    --focus: #7FB0FF;
+    --toast-accent: #0A6F5A;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* ---------- Progresso (sempre visibile) ---------- */
+.hero {
+  background: var(--band);
+  color: var(--band-ink);
+  padding: calc(env(safe-area-inset-top) + 20px) 20px 18px;
+}
+.hero-inner { max-width: 480px; margin: 0 auto; }
+.hero-num {
+  font-size: clamp(64px, 21vw, 92px);
+  line-height: .88;
+  font-weight: 800;
+  font-stretch: 70%;
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.hero-of { color: var(--band-muted); font-size: 15px; margin-top: 8px; }
+.bar {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 31), 1fr);
+  gap: 3px;
+  height: 34px;
+  margin-top: 18px;
+}
+.bar i {
+  display: block;
+  border-radius: 2px;
+  background: linear-gradient(to top, var(--band-fill) calc(var(--f) * 100%), var(--band-empty) calc(var(--f) * 100%));
+  transition: --f .55s cubic-bezier(.2, .7, .2, 1);
+  transition-delay: calc(var(--i) * 16ms);
+}
+.bar.settled i { transition-delay: 0s; }
+.ticks { position: relative; height: 18px; margin-top: 5px; font-size: 11px; color: var(--band-muted); font-stretch: 85%; }
+.ticks span { position: absolute; top: 3px; transform: translateX(-50%); font-variant-numeric: tabular-nums; }
+.ticks span::before { content: ''; position: absolute; left: 50%; top: -6px; width: 1px; height: 4px; background: var(--band-muted); }
+.ticks span.end { right: 0; transform: none; }
+.ticks span.end::before { left: auto; right: 0; }
+.hero-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 14px; }
+.hero-foot span:last-child { color: var(--band-muted); text-align: right; }
+
+/* ---------- Struttura ---------- */
+main { max-width: 480px; margin: 0 auto; padding: 14px 20px calc(96px + env(safe-area-inset-bottom)); }
+h2 { font-size: 20px; line-height: 1.2; font-weight: 650; }
+h3 { font-size: 17px; line-height: 1.25; font-weight: 650; }
+h4 { font-size: 16px; line-height: 1.25; font-weight: 650; }
+.block { padding: 18px 0; border-top: 1px solid var(--rule); }
+.block:first-of-type { border-top: 0; }
+.block-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.block-total { font-size: 21px; font-weight: 750; font-stretch: 78%; font-variant-numeric: tabular-nums; }
+.block-total small { font-size: 14px; font-weight: 450; font-stretch: 100%; color: var(--muted); }
+.hint { font-size: 14px; color: var(--muted); margin-top: 8px; max-width: 60ch; }
+.hint.warn { color: var(--pen); }
+.form-error { font-size: 14px; color: var(--sur); margin-top: 2px; }
+
+.field {
+  font-size: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--surface);
+  width: 100%;
+  min-width: 0;
+  appearance: none;
+}
+.field::placeholder { color: var(--muted); opacity: .8; }
+.select {
+  font-size: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+.btn {
+  font-weight: 650;
+  font-size: 16px;
+  padding: 12px 18px;
+  border-radius: var(--r);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  white-space: nowrap;
+}
+.btn:active { opacity: .8; }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
+.btn-danger { background: transparent; color: var(--sur); border-color: var(--sur); }
+.btn-danger.armed { background: var(--sur); color: #fff; }
+.row { display: flex; gap: 8px; align-items: stretch; }
+.row .field { flex: 1; }
+.linklike { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.textbtn { background: none; border: 0; padding: 6px 0; font-size: 15px; font-weight: 650; color: var(--def); }
+
+/* ---------- Giorno ---------- */
+.daynav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; padding-bottom: 6px; }
+.daynav-mid { text-align: center; min-height: 48px; display: flex; flex-direction: column; justify-content: center; }
+.daynav-sub { font-size: 14px; color: var(--muted); }
+.icon-btn {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 24px; line-height: 1;
+  display: grid; place-items: center;
+}
+.icon-btn:disabled { opacity: .3; }
+
+.banner {
+  background: var(--pen-soft);
+  border-left: 4px solid var(--pen-mark);
+  border-radius: 4px 12px 12px 4px;
+  padding: 14px;
+  margin: 10px 0 6px;
+}
+.banner p { font-size: 15px; }
+.banner .row { margin-top: 10px; }
+.banner-more { margin-top: 10px; font-size: 14px !important; }
+
+/* pasti */
+.meals { margin-top: 10px; }
+.meal { padding: 12px 0 14px; border-top: 1px solid var(--rule); }
+.meal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 32px; }
+.meal-total { font-weight: 700; font-stretch: 80%; font-variant-numeric: tabular-nums; }
+.meal-total small { font-weight: 450; font-stretch: 100%; color: var(--muted); font-size: 14px; }
+.meal.is-empty:not(.is-active) .meal-head h4 { color: var(--muted); font-weight: 550; }
+.meal-actions { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 4px; }
+
+.food-list { list-style: none; margin-top: 4px; }
+.food { display: grid; grid-template-columns: 1fr 40px; align-items: center; border-bottom: 1px solid var(--rule); }
+.food:last-child { border-bottom: 0; }
+.food-edit {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  background: none; border: 0; text-align: left; padding: 10px 6px 10px 0; width: 100%;
+}
+.food-name { overflow-wrap: anywhere; }
+.food-g { color: var(--muted); font-size: 14px; margin-left: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.food-kcal { font-weight: 650; font-stretch: 85%; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.food-del { width: 40px; height: 40px; background: none; border: 0; color: var(--muted); font-size: 22px; line-height: 1; }
+.food.is-editing { background: var(--surface); box-shadow: inset 3px 0 0 var(--ink); }
+.food.is-editing .food-edit { padding-left: 10px; }
+
+/* pannello di inserimento: vive dentro il pasto attivo */
+.panel { margin-top: 10px; padding-left: 12px; box-shadow: inset 3px 0 0 var(--def); }
+.panel-title { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+.food-form { display: grid; gap: 8px; }
+.food-form .g { flex: 1 1 4.5em; }
+.food-form .kcal { flex: 1 1 5em; }
+.food-form .btn { padding-left: 16px; padding-right: 16px; }
+.edit-extras { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.edit-extras label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.per100 summary { font-size: 14px; color: var(--muted); cursor: pointer; padding: 2px 0; width: max-content; }
+.per100 .row { margin-top: 8px; align-items: center; }
+.per100-out { font-size: 14px; color: var(--muted); white-space: nowrap; }
+
+.quick { margin-top: 14px; }
+.quick-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 7px 12px; font-size: 14px; text-align: left; }
+.chip span { color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.chip:active { background: var(--def-soft); }
+.chip.meal-chip { border-color: var(--def); }
+
+.save-form { margin-top: 8px; display: grid; gap: 8px; }
+.save-form > label { font-size: 14px; color: var(--muted); }
+.save-form .linklike { justify-self: start; font-size: 14px; }
+
+.burn-form { margin-top: 10px; }
+.result-num { font-size: 46px; line-height: 1; font-weight: 800; font-stretch: 70%; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.result-num small { font-size: 16px; font-weight: 500; font-stretch: 100%; margin-left: 6px; }
+.result-num.is-def { color: var(--def); }
+.result-num.is-sur { color: var(--sur); }
+.result-line { font-size: 14px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.result-wait { color: var(--muted); margin-top: 6px; max-width: 60ch; }
+
+/* ---------- Calendario ---------- */
+.monthnav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+.monthnav h2 { text-align: center; }
+.cal-week, .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-week { margin-top: 14px; }
+.cal-week span { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
+.cell {
+  aspect-ratio: 1 / 1.12;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--surface);
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 5px 5px 6px;
+  text-align: left;
+  position: relative;
+  min-width: 0;
+}
+.cell .d { font-size: 13px; font-weight: 600; line-height: 1.1; }
+.cell .v { font-size: 12px; font-weight: 750; font-stretch: 72%; text-align: right; font-variant-numeric: tabular-nums; line-height: 1; }
+.cell.is-def { background: var(--def-soft); }
+.cell.is-def .v { color: var(--def); }
+.cell.is-sur { background: var(--sur-soft); }
+.cell.is-sur .v { color: var(--sur); }
+.cell.is-pen { border: 1.5px dashed var(--pen-mark); }
+.cell.is-pen::after { content: ''; position: absolute; right: 7px; bottom: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--pen-mark); }
+.cell.is-today { box-shadow: inset 0 0 0 2px var(--ink); }
+.cell:disabled { opacity: .35; }
+.cell.blank { visibility: hidden; }
+.legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.def { background: var(--def-soft); box-shadow: inset 0 0 0 1px var(--def); }
+.sw.sur { background: var(--sur-soft); box-shadow: inset 0 0 0 1px var(--sur); }
+.sw.pen { border: 1.5px dashed var(--pen-mark); }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 16px; margin-top: 4px; }
+.stats dt { font-size: 13px; color: var(--muted); }
+.stats dd { font-size: 23px; font-weight: 750; font-stretch: 78%; font-variant-numeric: tabular-nums; line-height: 1.15; margin-top: 2px; }
+.stats dd small { font-size: 13px; font-weight: 450; font-stretch: 100%; color: var(--muted); display: block; line-height: 1.3; margin-top: 2px; }
+.stats .wide { grid-column: 1 / -1; }
+
+/* ---------- Impostazioni ---------- */
+.set-form { display: grid; gap: 14px; margin-top: 12px; }
+.set-form label { display: grid; gap: 6px; font-size: 15px; font-weight: 600; }
+.set-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.file-btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; }
+.file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-btn:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.saved-list { list-style: none; margin-top: 8px; }
+.saved-list li { display: grid; grid-template-columns: 1fr 40px; align-items: start; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.saved-list li:last-child { border-bottom: 0; }
+.saved-name { font-weight: 650; }
+.saved-meta { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- Barra di navigazione e avvisi ---------- */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--paper); border-top: 1px solid var(--rule); padding-bottom: env(safe-area-inset-bottom); z-index: 10; }
+.tabbar-inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0 10px; font-size: 12px; color: var(--muted); background: none; border: 0; }
+.tab svg { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--ink); font-weight: 650; }
+.tab[aria-current="page"] svg { color: var(--def); }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  width: min(440px, calc(100% - 32px));
+  background: var(--ink); color: var(--paper);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 15px; z-index: 20;
+}
+.toast button { background: none; border: 0; color: var(--toast-accent); font-weight: 700; padding: 4px 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar i { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="hero-num" id="totalNum">0</p>
+    <p class="hero-of">kcal di deficit su <span id="goalNum" class="num">31.000</span></p>
+    <div class="bar" id="bar" role="progressbar" aria-label="Avanzamento verso l'obiettivo" aria-valuemin="0"></div>
+    <div class="ticks" id="ticks" aria-hidden="true"></div>
+    <p class="hero-foot"><span id="remaining" class="num"></span><span id="fatEq" class="num"></span></p>
+  </div>
+</header>
+
+<main>
+  <!-- GIORNO -->
+  <section id="view-day" aria-label="Giorno">
+    <div class="daynav">
+      <button class="icon-btn" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
+      <div class="daynav-mid">
+        <h2 id="dayTitle"></h2>
+        <p class="daynav-sub" id="daySub"></p>
+      </div>
+      <button class="icon-btn" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
+    </div>
+
+    <div class="banner" id="banner" hidden>
+      <p><strong id="bannerTitle"></strong>: mancano le kcal consumate.</p>
+      <form class="row" id="bannerForm" novalidate>
+        <label class="vh" for="bannerInput" id="bannerLabel">Kcal consumate</label>
+        <input class="field num" id="bannerInput" inputmode="numeric" pattern="[0-9]*" placeholder="kcal consumate" autocomplete="off">
+        <button class="btn" type="submit">Salva</button>
+      </form>
+      <p class="banner-more" id="bannerMore" hidden></p>
+    </div>
+
+    <section class="block" aria-labelledby="h-eaten">
+      <div class="block-head">
+        <h3 id="h-eaten">Mangiato</h3>
+        <span class="block-total" id="intakeTotal">0 <small>kcal</small></span>
+      </div>
+
+      <div class="meals" id="meals">
+        <section class="meal" data-meal="colazione" aria-label="Colazione"></section>
+        <section class="meal" data-meal="pranzo" aria-label="Pranzo"></section>
+        <section class="meal" data-meal="cena" aria-label="Cena"></section>
+        <section class="meal" data-meal="spuntino" aria-label="Spuntino"></section>
+      </div>
+
+      <!-- pannello di inserimento: viene spostato dentro il pasto attivo -->
+      <div class="panel" id="panel">
+        <p class="panel-title" id="panelTitle"></p>
+        <form class="food-form" id="foodForm" novalidate>
+          <label class="vh" for="foodName">Cibo</label>
+          <input class="field" id="foodName" list="foodLib" placeholder="Cibo, es. yogurt greco" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" maxlength="80">
+          <datalist id="foodLib"></datalist>
+          <div class="row">
+            <label class="vh" for="foodGrams">Grammi</label>
+            <input class="field num g" id="foodGrams" inputmode="decimal" placeholder="g" autocomplete="off" enterkeyhint="next">
+            <label class="vh" for="foodKcal">Kcal</label>
+            <input class="field num kcal" id="foodKcal" inputmode="numeric" pattern="[0-9]*" placeholder="kcal" autocomplete="off" enterkeyhint="done">
+            <button class="btn" type="submit" id="foodSubmit">Aggiungi</button>
+          </div>
+          <div class="edit-extras" id="editExtras" hidden>
+            <label>Pasto
+              <select class="select" id="foodMeal">
+                <option value="colazione">Colazione</option>
+                <option value="pranzo">Pranzo</option>
+                <option value="cena">Cena</option>
+                <option value="spuntino">Spuntino</option>
+              </select>
+            </label>
+            <button type="button" class="linklike" id="foodCancel">Annulla modifica</button>
+          </div>
+          <details class="per100" id="per100Box">
+            <summary>Ho le kcal per 100 g</summary>
+            <div class="row">
+              <label class="vh" for="foodPer100">Kcal per 100 grammi</label>
+              <input class="field num" id="foodPer100" inputmode="decimal" placeholder="kcal per 100 g" autocomplete="off">
+              <span class="per100-out" id="per100Out" aria-live="polite"></span>
+            </div>
+          </details>
+          <p class="form-error" id="foodError" role="alert" hidden></p>
+        </form>
+
+        <div class="quick" id="savedQuick" hidden>
+          <p class="quick-label" id="savedLabel"></p>
+          <div class="chips" id="savedChips"></div>
+        </div>
+        <div class="quick" id="quick" hidden>
+          <p class="quick-label" id="quickLabel"></p>
+          <div class="chips" id="chips"></div>
+        </div>
+      </div>
+
+      <!-- salvataggio di un pasto: viene spostato nel pasto da salvare -->
+      <form class="save-form" id="saveForm" novalidate hidden>
+        <label for="saveName">Nome del pasto da salvare</label>
+        <div class="row">
+          <input class="field" id="saveName" maxlength="60" autocomplete="off" autocapitalize="sentences" enterkeyhint="done">
+          <button class="btn" type="submit">Salva</button>
+        </div>
+        <button type="button" class="linklike" id="saveCancel">Annulla</button>
+      </form>
+    </section>
+
+    <section class="block" aria-labelledby="h-burn">
+      <h3 id="h-burn">Consumate</h3>
+      <form class="row burn-form" id="burnForm" novalidate>
+        <label class="vh" for="burnInput">Kcal totali consumate</label>
+        <input class="field num" id="burnInput" inputmode="numeric" pattern="[0-9]*" placeholder="kcal totali del giorno" autocomplete="off">
+        <button class="btn" type="submit">Salva</button>
+      </form>
+      <p class="hint" id="burnHint"></p>
+    </section>
+
+    <section class="block" aria-labelledby="h-result" aria-live="polite">
+      <h3 id="h-result">Risultato del giorno</h3>
+      <div id="result"></div>
+    </section>
+  </section>
+
+  <!-- CALENDARIO -->
+  <section id="view-cal" aria-label="Calendario" hidden>
+    <div class="monthnav">
+      <button class="icon-btn" id="prevMonth" type="button" aria-label="Mese precedente">‹</button>
+      <h2 id="monthTitle"></h2>
+      <button class="icon-btn" id="nextMonth" type="button" aria-label="Mese successivo">›</button>
+    </div>
+    <div class="cal-week" aria-hidden="true"><span>L</span><span>M</span><span>M</span><span>G</span><span>V</span><span>S</span><span>D</span></div>
+    <div class="cal" id="calGrid"></div>
+    <ul class="legend">
+      <li><span class="sw def"></span>Deficit</li>
+      <li><span class="sw sur"></span>Surplus</li>
+      <li><span class="sw pen"></span>Da chiudere</li>
+    </ul>
+    <section class="block" style="margin-top:14px" aria-label="Statistiche">
+      <dl class="stats" id="stats"></dl>
+    </section>
+  </section>
+
+  <!-- IMPOSTAZIONI -->
+  <section id="view-set" aria-label="Impostazioni" hidden>
+    <section class="block">
+      <h2>Obiettivo</h2>
+      <form class="set-form" id="setForm" novalidate>
+        <label>Deficit da raggiungere (kcal)
+          <input class="field num" id="setGoal" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+        </label>
+        <label>Data di inizio
+          <input class="field" id="setStart" type="date">
+        </label>
+        <p class="hint">Nel totale entrano solo i giorni dalla data di inizio in poi.</p>
+        <p class="form-error" id="setError" role="alert" hidden></p>
+        <div><button class="btn" type="submit">Salva impostazioni</button></div>
+      </form>
+    </section>
+
+    <section class="block">
+      <h3>Pasti salvati</h3>
+      <p class="hint" id="savedEmpty">Nessun pasto salvato. Nella vista Giorno usa «Salva come pasto» sotto colazione, pranzo, cena o spuntino.</p>
+      <ul class="saved-list" id="savedList"></ul>
+      <p class="hint">Per modificare un pasto, salvane uno nuovo con lo stesso nome: sostituisce il vecchio.</p>
+    </section>
+
+    <section class="block">
+      <h3>Backup</h3>
+      <p class="hint">I dati sono salvati solo in questo browser, su questo telefono. Esporta un backup ogni tanto e prima di cambiare telefono o di cancellare i dati del browser.</p>
+      <div class="set-actions">
+        <button class="btn" type="button" id="exportBtn">Esporta backup</button>
+        <span class="btn btn-ghost file-btn">Importa backup<input type="file" id="importInput" accept="application/json,.json" aria-label="Importa backup"></span>
+      </div>
+      <p class="hint" id="lastBackup"></p>
+    </section>
+
+    <section class="block">
+      <h3>Cancella i dati</h3>
+      <p class="hint">Elimina tutti i giorni e i pasti salvati da questo telefono. Non si può annullare.</p>
+      <div class="set-actions"><button class="btn btn-danger" type="button" id="resetBtn">Cancella tutti i dati</button></div>
+    </section>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Sezioni">
+  <div class="tabbar-inner">
+    <button class="tab" type="button" data-view="day" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
+      Giorno
+    </button>
+    <button class="tab" type="button" data-view="cal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+      Calendario
+    </button>
+    <button class="tab" type="button" data-view="set">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      Impostazioni
+    </button>
+  </div>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'deficit-tracker-v1';   // stessa chiave della prima versione: i dati già inseriti restano
+  const KCAL_PER_KG = 7700;           // stima convenzionale: kcal per 1 kg di grasso corporeo
+  const LOW_BURN = 1200;              // sotto questa soglia avvisa: forse sono solo le kcal attive
+  const MEALS = [
+    { k: 'colazione', label: 'Colazione' },
+    { k: 'pranzo', label: 'Pranzo' },
+    { k: 'cena', label: 'Cena' },
+    { k: 'spuntino', label: 'Spuntino' },
+  ];
+  const MEAL_KEYS = MEALS.map((m) => m.k);
+  const mealLabel = (k) => (MEALS.find((m) => m.k === k) || MEALS[3]).label;
+
+  /* ---------- utilità ---------- */
+  const $ = (s) => document.querySelector(s);
+  const pad = (n) => String(n).padStart(2, '0');
+  const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (k, n) => { const d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); };
+  const todayKey = () => keyOf(new Date());
+  const isKey = (k) => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k) && !isNaN(parseKey(k));
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function fmt(n) {
+    const r = Math.round(n);
+    const s = Math.abs(r).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (r < 0 ? '−' : '') + s;
+  }
+  const fmtG = (g) => (Math.round(g * 10) / 10).toLocaleString('it-IT', { maximumFractionDigits: 1 });
+  const fmtKg = (x) => x.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const longDate = (k) => cap(parseKey(k).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }));
+  const shortDate = (k) => parseKey(k).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+  // kcal: il punto è separatore delle migliaia ("1.250" = 1250)
+  function parseKcal(v) {
+    const s = String(v).trim().replace(/[.\s]/g, '').replace(',', '.');
+    if (s === '') return NaN;
+    const n = Number(s);
+    return Number.isFinite(n) ? Math.round(n) : NaN;
+  }
+  // grammi: accetta sia la virgola sia il punto come decimale
+  function parseDec(v) {
+    const s = String(v).trim().replace(',', '.');
+    if (s === '') return NaN;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  const cleanGrams = (g) => (Number.isFinite(+g) && +g > 0 ? Math.round(+g * 10) / 10 : null);
+
+  function slotForNow() {
+    const d = new Date();
+    const h = d.getHours() + d.getMinutes() / 60;
+    if (h < 10.5) return 'colazione';
+    if (h < 15) return 'pranzo';
+    if (h < 18.5) return 'spuntino';
+    return 'cena';
+  }
+
+  /* ---------- dati ---------- */
+  const defaults = () => ({ v: 2, goal: 31000, start: todayKey(), days: {}, meals: [], lastBackup: null });
+
+  function cleanItem(f) {
+    return {
+      name: String(f.name || 'Senza nome').trim().slice(0, 80) || 'Senza nome',
+      grams: cleanGrams(f.grams),
+      kcal: Math.round(+f.kcal),
+    };
+  }
+  const validItem = (f) => f && Number.isFinite(+f.kcal) && +f.kcal >= 0;
+
+  function sanitize(s) {
+    if (!s || typeof s !== 'object' || !s.days || typeof s.days !== 'object') return null;
+    const out = {
+      v: 2,
+      goal: Number.isFinite(+s.goal) && +s.goal > 0 ? Math.round(+s.goal) : 31000,
+      start: isKey(s.start) ? s.start : todayKey(),
+      days: {},
+      meals: [],
+      lastBackup: typeof s.lastBackup === 'string' ? s.lastBackup : null,
+    };
+    for (const [k, d] of Object.entries(s.days)) {
+      if (!isKey(k) || !d || typeof d !== 'object') continue;
+      const foods = Array.isArray(d.foods)
+        ? d.foods.filter(validItem).map((f) => ({
+            id: String(f.id || uid()),
+            ...cleanItem(f),
+            meal: MEAL_KEYS.includes(f.meal) ? f.meal : 'spuntino',   // i cibi della prima versione vanno in Spuntino
+          }))
+        : [];
+      const b = d.burned;
+      const burned = b !== null && b !== undefined && b !== '' && Number.isFinite(+b) && +b > 0 ? Math.round(+b) : null;
+      if (foods.length || burned !== null) out.days[k] = { foods, burned };
+    }
+    if (Array.isArray(s.meals)) {
+      for (const m of s.meals) {
+        if (!m || !Array.isArray(m.items)) continue;
+        const items = m.items.filter(validItem).map(cleanItem);
+        if (!items.length) continue;
+        out.meals.push({
+          id: String(m.id || uid()),
+          name: String(m.name || 'Pasto').trim().slice(0, 60) || 'Pasto',
+          slot: MEAL_KEYS.includes(m.slot) ? m.slot : 'spuntino',
+          items,
+        });
+      }
+    }
+    return out;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return defaults();
+      return sanitize(JSON.parse(raw)) || defaults();
+    } catch (e) { return defaults(); }
+  }
+
+  let state = load();
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+    catch (e) { toast('Salvataggio non riuscito: la memoria del browser è piena o bloccata.'); return false; }
+  }
+
+  const dayOf = (k) => state.days[k] || { foods: [], burned: null };
+  const ensureDay = (k) => state.days[k] || (state.days[k] = { foods: [], burned: null });
+  function prune(k) { const d = state.days[k]; if (d && !d.foods.length && d.burned === null) delete state.days[k]; }
+  const sumKcal = (list) => list.reduce((a, f) => a + f.kcal, 0);
+  const intake = (d) => sumKcal(d.foods);
+  const isClosed = (d) => d.foods.length > 0 && d.burned !== null;
+  const deficitOf = (d) => d.burned - intake(d);
+  const minKey = () => { const t = todayKey(); return state.start < t ? state.start : t; };
+
+  function summary() {
+    const t = todayKey();
+    let total = 0, n = 0, best = null;
+    const pending = [];
+    for (const [k, d] of Object.entries(state.days)) {
+      if (k < state.start || k > t) continue;
+      if (isClosed(d)) {
+        const x = deficitOf(d);
+        total += x; n++;
+        if (!best || x > best.x) best = { k, x };
+      } else if (d.foods.length && k < t) {
+        pending.push(k);
+      }
+    }
+    pending.sort();
+    return { total, n, avg: n ? total / n : 0, best, pending };
+  }
+
+  // archivio dei cibi già usati: ultima porzione (grammi e kcal) e quante volte
+  function library() {
+    const m = new Map();
+    for (const k of Object.keys(state.days).sort()) {
+      for (const f of state.days[k].foods) {
+        const id = f.name.toLowerCase();
+        if (!id || id === 'senza nome') continue;
+        const e = m.get(id) || { name: f.name, grams: f.grams, kcal: f.kcal, count: 0, last: k };
+        e.count++; e.name = f.name; e.grams = f.grams; e.kcal = f.kcal; e.last = k;
+        m.set(id, e);
+      }
+    }
+    return [...m.values()].sort((a, b) => b.count - a.count || (a.last < b.last ? 1 : a.last > b.last ? -1 : 0));
+  }
+  const portion = (x) => (x.grams ? `${fmtG(x.grams)} g, ${fmt(x.kcal)} kcal` : `${fmt(x.kcal)} kcal`);
+
+  /* ---------- scheletro dei pasti ---------- */
+  const panelEl = $('#panel');
+  const saveEl = $('#saveForm');
+  document.querySelectorAll('.meal').forEach((sec) => {
+    sec.innerHTML = '<div class="meal-head"></div><ul class="food-list"></ul><div class="meal-actions"></div><div class="slot-save"></div><div class="slot-panel"></div>';
+  });
+
+  /* ---------- stato dell'interfaccia ---------- */
+  let view = 'day';
+  let sel = todayKey();
+  let renderedSel = null;
+  let lastToday = todayKey();
+  let activeMeal = slotForNow();
+  let editId = null;
+  let saveFor = null;
+  let chipCache = [];
+  let savedCache = [];
+  let libCache = new Map();
+  // compilazione automatica del modulo
+  let libRatio = null;    // kcal per grammo del cibo riconosciuto (o del cibo in modifica)
+  let kcalAuto = false;   // le kcal nel campo sono calcolate, non scritte a mano
+  let gramsAuto = false;  // i grammi nel campo vengono dall'archivio
+  const now = new Date();
+  let calY = now.getFullYear(), calM = now.getMonth();
+
+  /* ---------- avvisi ---------- */
+  let toastTimer = null;
+  function toast(msg, undo) {
+    const el = $('#toast');
+    el.textContent = '';
+    const span = document.createElement('span');
+    span.textContent = msg;
+    el.append(span);
+    if (undo) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Annulla';
+      b.addEventListener('click', () => { undo(); hideToast(); });
+      el.append(b);
+    }
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, undo ? 5000 : 2800);
+  }
+  function hideToast() { $('#toast').hidden = true; }
+
+  /* ---------- progresso ---------- */
+  function renderHero(S) {
+    const goal = state.goal, total = S.total;
+    $('#totalNum').textContent = fmt(total);
+    $('#goalNum').textContent = fmt(goal);
+
+    const nSeg = Math.min(60, Math.max(10, Math.round(goal / 1000)));
+    const per = goal / nSeg;
+    const bar = $('#bar');
+    const fill = () => [...bar.children].forEach((el, i) => {
+      el.style.setProperty('--f', Math.max(0, Math.min(1, (total - i * per) / per)).toFixed(3));
+    });
+    if (bar.children.length !== nSeg) {
+      bar.style.setProperty('--n', nSeg);
+      bar.innerHTML = Array.from({ length: nSeg }, (_, i) => `<i style="--i:${i}"></i>`).join('');
+      renderTicks();
+      // i segmenti appena creati partono vuoti e si riempiono al frame successivo
+      requestAnimationFrame(() => requestAnimationFrame(fill));
+    } else {
+      fill();
+    }
+    bar.setAttribute('aria-valuemax', goal);
+    bar.setAttribute('aria-valuenow', Math.max(0, Math.min(goal, Math.round(total))));
+    bar.setAttribute('aria-valuetext', `${fmt(total)} kcal su ${fmt(goal)}`);
+
+    const rem = goal - total;
+    $('#remaining').textContent = rem > 0 ? `Mancano ${fmt(rem)} kcal` : (rem < 0 ? `Obiettivo superato di ${fmt(-rem)} kcal` : 'Obiettivo raggiunto');
+    $('#fatEq').textContent = total > 0 ? `≈ ${fmtKg(total / KCAL_PER_KG)} kg di grasso` : '';
+  }
+
+  function renderTicks() {
+    const goal = state.goal;
+    const step = goal >= 40000 ? 20000 : goal >= 20000 ? 10000 : goal >= 8000 ? 5000 : 1000;
+    let html = '';
+    for (let v = step; v < goal - step * 0.35; v += step) {
+      html += `<span style="left:${(v / goal * 100).toFixed(3)}%">${fmt(v)}</span>`;
+    }
+    html += `<span class="end">${fmt(goal)}</span>`;
+    $('#ticks').innerHTML = html;
+  }
+
+  /* ---------- giorno ---------- */
+  function renderDay(S) {
+    const t = todayKey();
+    const d = dayOf(sel);
+    const changed = renderedSel !== sel;
+
+    $('#dayTitle').textContent = longDate(sel);
+    const sub = $('#daySub');
+    if (sel === t) sub.textContent = 'Oggi';
+    else {
+      const label = sel === addDays(t, -1) ? 'Ieri' : (parseKey(sel).getFullYear() !== new Date().getFullYear() ? String(parseKey(sel).getFullYear()) : '');
+      sub.innerHTML = `${label ? esc(label) + ', ' : ''}<button type="button" class="linklike" id="goToday">torna a oggi</button>`;
+    }
+    $('#prevDay').disabled = sel <= minKey();
+    $('#nextDay').disabled = sel >= t;
+
+    if (changed) {
+      if (editId) exitEdit(false);
+      clearForm();
+      saveFor = null;
+      $('#foodError').hidden = true;
+      if (sel === t) activeMeal = slotForNow();
+    }
+
+    $('#intakeTotal').innerHTML = `${fmt(intake(d))} <small>kcal</small>`;
+
+    // pasti: lo scheletro di ogni pasto è fisso, si aggiornano solo intestazione, lista e azioni
+    for (const m of MEALS) {
+      const sec = document.querySelector(`.meal[data-meal="${m.k}"]`);
+      const items = d.foods.filter((f) => f.meal === m.k);
+      const active = activeMeal === m.k;
+      const empty = items.length === 0;
+      sec.classList.toggle('is-active', active);
+      sec.classList.toggle('is-empty', empty);
+      const total = empty ? '' : `<span class="meal-total">${fmt(sumKcal(items))} <small>kcal</small></span>`;
+      const headAdd = empty && !active ? `<button type="button" class="textbtn" data-add="${m.k}" aria-label="Aggiungi a ${m.label}">Aggiungi</button>` : '';
+      sec.querySelector('.meal-head').innerHTML = `<h4>${m.label}</h4>${total}${headAdd}`;
+      sec.querySelector('.food-list').innerHTML = items.map((f) => `
+        <li class="food${f.id === editId ? ' is-editing' : ''}" data-id="${esc(f.id)}">
+          <button type="button" class="food-edit"><span class="vh">Modifica </span><span class="food-name">${esc(f.name)}${f.grams ? `<span class="food-g">${fmtG(f.grams)} g</span>` : ''}</span><span class="food-kcal">${fmt(f.kcal)}</span></button>
+          <button type="button" class="food-del" aria-label="Elimina ${esc(f.name)}">×</button>
+        </li>`).join('');
+      sec.querySelector('.food-list').hidden = empty;
+      const acts = [];
+      if (!empty && !active) acts.push(`<button type="button" class="textbtn" data-add="${m.k}" aria-label="Aggiungi a ${m.label}">Aggiungi</button>`);
+      if (!empty && saveFor !== m.k) acts.push(`<button type="button" class="textbtn" data-save="${m.k}">Salva come pasto</button>`);
+      const actsEl = sec.querySelector('.meal-actions');
+      actsEl.innerHTML = acts.join('');
+      actsEl.hidden = acts.length === 0;
+    }
+
+    // pannello di inserimento nel pasto attivo (spostato solo se cambia pasto, così la tastiera resta aperta)
+    const slot = document.querySelector(`.meal[data-meal="${activeMeal}"] .slot-panel`);
+    if (panelEl.parentNode !== slot) slot.append(panelEl);
+    $('#panelTitle').textContent = editId ? 'Modifica il cibo' : `Aggiungi a ${mealLabel(activeMeal).toLowerCase()}`;
+
+    // modulo di salvataggio pasto
+    if (saveFor) {
+      const sslot = document.querySelector(`.meal[data-meal="${saveFor}"] .slot-save`);
+      if (saveEl.parentNode !== sslot) sslot.append(saveEl);
+      saveEl.hidden = false;
+    } else {
+      saveEl.hidden = true;
+    }
+
+    // archivio, pasti salvati e frequenti
+    const lib = library();
+    libCache = new Map(lib.map((e) => [e.name.toLowerCase(), e]));
+    $('#foodLib').innerHTML = lib.map((e) => `<option value="${esc(e.name)}" label="${esc(portion(e))}"></option>`).join('');
+
+    savedCache = [...state.meals].sort((a, b) => (b.slot === activeMeal) - (a.slot === activeMeal) || a.name.localeCompare(b.name, 'it'));
+    $('#savedQuick').hidden = savedCache.length === 0 || !!editId;
+    $('#savedLabel').textContent = `Pasti salvati, tocca per aggiungerli a ${mealLabel(activeMeal).toLowerCase()}`;
+    $('#savedChips').innerHTML = savedCache.map((m, i) => `<button type="button" class="chip meal-chip" data-i="${i}">${esc(m.name)}<span>${fmt(sumKcal(m.items))} kcal</span></button>`).join('');
+
+    chipCache = lib.filter((e) => e.count >= 2).slice(0, 8);
+    $('#quick').hidden = chipCache.length === 0 || !!editId;
+    $('#quickLabel').textContent = `Frequenti, tocca per aggiungere a ${mealLabel(activeMeal).toLowerCase()}`;
+    $('#chips').innerHTML = chipCache.map((e, i) => `<button type="button" class="chip" data-i="${i}">${esc(e.name)}<span>${esc(portion(e))}</span></button>`).join('');
+
+    // consumate
+    const burnInput = $('#burnInput');
+    if (changed || document.activeElement !== burnInput) burnInput.value = d.burned ?? '';
+    const hint = $('#burnHint');
+    if (d.burned !== null && d.burned < LOW_BURN) {
+      hint.className = 'hint warn';
+      hint.textContent = `${fmt(d.burned)} kcal è un valore basso per un giorno intero: controlla che sia il totale (attive + a riposo) e non solo le attive.`;
+    } else {
+      hint.className = 'hint';
+      hint.textContent = sel === t
+        ? 'Il totale della giornata dallo smartwatch, attive più a riposo. Di solito si inserisce domani mattina, a giornata finita.'
+        : 'Il totale della giornata dallo smartwatch, attive più a riposo.';
+    }
+
+    // risultato
+    const res = $('#result');
+    if (isClosed(d)) {
+      const x = deficitOf(d);
+      const cls = x >= 0 ? 'is-def' : 'is-sur';
+      const word = x > 0 ? 'di deficit' : x < 0 ? 'di surplus' : 'in pari';
+      const note = sel < state.start ? '<p class="result-wait">Questo giorno è prima della data di inizio e non entra nel totale.</p>' : '';
+      res.innerHTML = `
+        <p class="result-num ${cls}">${fmt(Math.abs(x))}<small>kcal ${word}</small></p>
+        <p class="result-line">${fmt(d.burned)} consumate − ${fmt(intake(d))} mangiate${x < 0 ? ', tolte dal totale' : ''}</p>${note}`;
+    } else if (d.foods.length && d.burned === null) {
+      res.innerHTML = `<p class="result-wait">${sel === t
+        ? 'Domani mattina inserisci le kcal consumate di oggi per chiudere la giornata.'
+        : 'Inserisci le kcal consumate per chiudere la giornata.'}</p>`;
+    } else if (!d.foods.length && d.burned !== null) {
+      res.innerHTML = '<p class="result-wait">Aggiungi i cibi: senza, la giornata non entra nel totale. Se hai digiunato, aggiungi «Digiuno» con 0 kcal.</p>';
+    } else {
+      res.innerHTML = '<p class="result-wait">Il deficit compare quando ci sono sia i cibi sia le kcal consumate.</p>';
+    }
+
+    renderBanner(S);
+    renderedSel = sel;
+  }
+
+  let bannerKey = null;
+  function renderBanner(S) {
+    const others = S.pending.filter((k) => k !== sel);
+    const banner = $('#banner');
+    if (!others.length) { banner.hidden = true; bannerKey = null; return; }
+    const k = others[others.length - 1];          // il più recente, di solito ieri
+    const t = todayKey();
+    const name = k === addDays(t, -1) ? 'ieri' : longDate(k).toLowerCase();
+    if (bannerKey !== k) $('#bannerInput').value = '';
+    bannerKey = k;
+    $('#bannerTitle').textContent = `Chiudi ${name}`;
+    $('#bannerLabel').textContent = `Kcal consumate ${name}`;
+    const more = $('#bannerMore');
+    const rest = others.length - 1;
+    if (rest > 0) {
+      more.hidden = false;
+      more.innerHTML = `${rest === 1 ? 'C’è un altro giorno' : `Ci sono altri ${rest} giorni`} da chiudere. <button type="button" class="linklike" data-goto="${others[0]}">Apri ${rest === 1 ? 'quel giorno' : 'il più vecchio'}</button>`;
+    } else {
+      more.hidden = true;
+    }
+    banner.hidden = false;
+  }
+
+  function clearForm() {
+    $('#foodName').value = '';
+    $('#foodGrams').value = '';
+    $('#foodKcal').value = '';
+    $('#foodPer100').value = '';
+    $('#per100Out').textContent = '';
+    libRatio = null; kcalAuto = false; gramsAuto = false;
+  }
+
+  function exitEdit(rerender = true) {
+    editId = null;
+    $('#foodSubmit').textContent = 'Aggiungi';
+    $('#editExtras').hidden = true;
+    clearForm();
+    if (rerender) render();
+  }
+
+  // kcal dai grammi: prima le kcal per 100 g se inserite, poi la proporzione del cibo riconosciuto
+  function currentRatio() {
+    const p = parseDec($('#foodPer100').value);
+    if (Number.isFinite(p) && p >= 0) return p / 100;
+    return libRatio;
+  }
+  function recompute() {
+    const g = parseDec($('#foodGrams').value);
+    const ratio = currentRatio();
+    const out = $('#per100Out');
+    if (Number.isFinite(g) && g > 0 && ratio !== null && (kcalAuto || $('#foodKcal').value.trim() === '')) {
+      $('#foodKcal').value = Math.round(g * ratio);
+      kcalAuto = true;
+    }
+    const p = parseDec($('#foodPer100').value);
+    if (Number.isFinite(p)) out.textContent = Number.isFinite(g) && g > 0 ? `= ${fmt(Math.round(g * p / 100))} kcal` : 'inserisci i grammi';
+    else out.textContent = '';
+  }
+
+  function setBurned(k, raw) {
+    const s = String(raw).trim();
+    const d = ensureDay(k);
+    if (s === '') {
+      if (d.burned === null) { prune(k); return false; }
+      const prev = d.burned;
+      d.burned = null; prune(k); save(); render();
+      toast('Kcal consumate rimosse.', () => { ensureDay(k).burned = prev; save(); render(); });
+      return true;
+    }
+    const v = parseKcal(s);
+    if (!Number.isFinite(v) || v < 1 || v > 15000) {
+      prune(k);
+      toast('Inserisci le kcal consumate come numero, per esempio 2650.');
+      return false;
+    }
+    d.burned = v; save(); render();
+    if (isClosed(d)) {
+      const x = deficitOf(d);
+      const who = k === todayKey() ? 'Oggi' : k === addDays(todayKey(), -1) ? 'Ieri' : cap(shortDate(k));
+      toast(x >= 0 ? `${who} chiuso: deficit di ${fmt(x)} kcal.` : `${who} chiuso: surplus di ${fmt(-x)} kcal.`);
+    } else {
+      toast('Kcal consumate salvate. Aggiungi i cibi per chiudere il giorno.');
+    }
+    return true;
+  }
+
+  function addItems(k, meal, items) {
+    const d = ensureDay(k);
+    const added = items.map((it) => ({ id: uid(), name: it.name, grams: it.grams ?? null, kcal: it.kcal, meal }));
+    d.foods.push(...added);
+    save(); render();
+    return () => {
+      const day = ensureDay(k);
+      const ids = new Set(added.map((a) => a.id));
+      day.foods = day.foods.filter((f) => !ids.has(f.id));
+      prune(k); save(); render();
+    };
+  }
+
+  function suggestMealName(items) {
+    const names = [...new Set(items.map((f) => f.name))];
+    let s = names.join(', ');
+    if (s.length > 50) s = s.slice(0, 48).replace(/[,\s]+[^,]*$/, '') + '…';
+    return s;
+  }
+
+  /* ---------- calendario ---------- */
+  function renderCal(S) {
+    const t = todayKey();
+    const mk = minKey();
+    $('#monthTitle').textContent = cap(new Date(calY, calM, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }));
+    const first = new Date(calY, calM, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const nDays = new Date(calY, calM + 1, 0).getDate();
+    let html = '';
+    for (let i = 0; i < offset; i++) html += '<span class="cell blank" aria-hidden="true"></span>';
+    let monthTotal = 0, monthN = 0;
+    for (let day = 1; day <= nDays; day++) {
+      const k = keyOf(new Date(calY, calM, day));
+      const d = dayOf(k);
+      const off = k > t || k < mk;
+      let cls = 'cell', val = '', label = shortDate(k);
+      if (isClosed(d)) {
+        const x = deficitOf(d);
+        cls += x >= 0 ? ' is-def' : ' is-sur';
+        val = fmt(x);
+        label += x >= 0 ? `: deficit ${fmt(x)} kcal` : `: surplus ${fmt(-x)} kcal`;
+        if (k >= state.start && k <= t) { monthTotal += x; monthN++; }
+      } else if (d.foods.length && k < t) {
+        cls += ' is-pen'; label += ': da chiudere';
+      } else if (d.foods.length) {
+        label += `: ${fmt(intake(d))} kcal mangiate finora`;
+      }
+      if (k === t) { cls += ' is-today'; label += ', oggi'; }
+      html += `<button type="button" class="${cls}" data-k="${k}" aria-label="${esc(label)}"${off ? ' disabled' : ''}><span class="d">${day}</span><span class="v">${val}</span></button>`;
+    }
+    $('#calGrid').innerHTML = html;
+
+    const minD = parseKey(mk);
+    $('#prevMonth').disabled = calY < minD.getFullYear() || (calY === minD.getFullYear() && calM <= minD.getMonth());
+    const nowD = new Date();
+    $('#nextMonth').disabled = calY > nowD.getFullYear() || (calY === nowD.getFullYear() && calM >= nowD.getMonth());
+
+    // statistiche
+    const rem = state.goal - S.total;
+    let eta, etaNote = '';
+    if (rem <= 0) { eta = 'Raggiunto'; }
+    else if (S.n < 3) { eta = '—'; etaNote = `servono almeno 3 giorni chiusi (ora ${S.n})`; }
+    else if (S.avg <= 0) { eta = '—'; etaNote = 'la media è in surplus'; }
+    else {
+      const days = Math.ceil(rem / S.avg);
+      eta = shortDate(addDays(t, days));
+      etaNote = `tra ${days} ${days === 1 ? 'giorno' : 'giorni'}, se la media resta questa`;
+    }
+    const monthName = new Date(calY, calM, 1).toLocaleDateString('it-IT', { month: 'long' });
+    let stats = `
+      <div><dt>Giorni chiusi</dt><dd>${S.n}</dd></div>
+      <div><dt>Media al giorno</dt><dd>${S.n ? fmt(S.avg) : '—'}${S.n ? '<small>kcal di deficit</small>' : ''}</dd></div>
+      <div><dt>Totale di ${esc(monthName)}</dt><dd>${fmt(monthTotal)}<small>kcal in ${monthN} ${monthN === 1 ? 'giorno' : 'giorni'}</small></dd></div>
+      <div><dt>Giorno migliore</dt><dd>${S.best ? fmt(S.best.x) : '—'}${S.best ? `<small>${esc(shortDate(S.best.k))}</small>` : ''}</dd></div>
+      <div class="wide"><dt>Arrivo stimato all’obiettivo</dt><dd>${esc(eta)}${etaNote ? `<small>${esc(etaNote)}</small>` : ''}</dd></div>`;
+    if (S.pending.length) {
+      stats += `<div class="wide"><dt>Da chiudere</dt><dd>${S.pending.length}<small>${S.pending.length === 1 ? 'giorno' : 'giorni'} con i cibi ma senza kcal consumate</small></dd></div>`;
+    }
+    $('#stats').innerHTML = stats;
+  }
+
+  /* ---------- impostazioni ---------- */
+  let resetArmed = null;
+  function renderSettings() {
+    if (document.activeElement !== $('#setGoal')) $('#setGoal').value = state.goal;
+    if (document.activeElement !== $('#setStart')) $('#setStart').value = state.start;
+    $('#lastBackup').textContent = state.lastBackup
+      ? `Ultimo backup esportato: ${shortDate(state.lastBackup)}.`
+      : 'Nessun backup esportato finora.';
+    $('#savedEmpty').hidden = state.meals.length > 0;
+    $('#savedList').innerHTML = state.meals.map((m) => `
+      <li data-id="${esc(m.id)}">
+        <div>
+          <p class="saved-name">${esc(m.name)}</p>
+          <p class="saved-meta">${esc(mealLabel(m.slot))}, ${fmt(sumKcal(m.items))} kcal</p>
+          <p class="saved-meta">${m.items.map((it) => esc(it.name) + (it.grams ? ` ${fmtG(it.grams)} g` : '')).join(', ')}</p>
+        </div>
+        <button type="button" class="food-del" aria-label="Elimina il pasto ${esc(m.name)}">×</button>
+      </li>`).join('');
+  }
+
+  /* ---------- render generale ---------- */
+  function render() {
+    const S = summary();
+    renderHero(S);
+    if (view === 'day') renderDay(S);
+    else if (view === 'cal') renderCal(S);
+    else renderSettings();
+  }
+
+  function show(v) {
+    view = v;
+    $('#view-day').hidden = v !== 'day';
+    $('#view-cal').hidden = v !== 'cal';
+    $('#view-set').hidden = v !== 'set';
+    document.querySelectorAll('.tab').forEach((b) => {
+      if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    if (v === 'day') renderedSel = null;
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function goDay(k, focusBurn) {
+    sel = k;
+    if (view !== 'day') show('day'); else render();
+    if (focusBurn) setTimeout(() => $('#burnInput').focus(), 50);
+  }
+
+  /* ---------- eventi: giorno ---------- */
+  $('#prevDay').addEventListener('click', () => { if (sel > minKey()) goDay(addDays(sel, -1)); });
+  $('#nextDay').addEventListener('click', () => { if (sel < todayKey()) goDay(addDays(sel, 1)); });
+  $('#daySub').addEventListener('click', (e) => { if (e.target.id === 'goToday') goDay(todayKey()); });
+
+  $('#foodName').addEventListener('input', (e) => {
+    const hit = libCache.get(e.target.value.trim().toLowerCase());
+    const gEl = $('#foodGrams'), kEl = $('#foodKcal');
+    if (hit) {
+      libRatio = hit.grams ? hit.kcal / hit.grams : null;
+      if (gEl.value.trim() === '' || gramsAuto) { gEl.value = hit.grams ? fmtG(hit.grams) : ''; gramsAuto = !!hit.grams; }
+      if (kEl.value.trim() === '' || kcalAuto) {
+        kEl.value = hit.kcal; kcalAuto = true;
+        recompute();          // se i grammi erano già scritti a mano, ricalcola in proporzione
+      }
+    } else {
+      libRatio = null;
+      if (gramsAuto) { gEl.value = ''; gramsAuto = false; }
+      if (kcalAuto) { kEl.value = ''; kcalAuto = false; recompute(); }
+    }
+  });
+  $('#foodName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); $('#foodGrams').focus(); }
+  });
+  $('#foodGrams').addEventListener('input', () => { gramsAuto = false; recompute(); });
+  $('#foodGrams').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); $('#foodKcal').focus(); }
+  });
+  $('#foodKcal').addEventListener('input', () => { kcalAuto = false; });
+  $('#foodPer100').addEventListener('input', () => {
+    if ($('#foodPer100').value.trim() !== '') kcalAuto = true;
+    recompute();
+  });
+
+  $('#foodForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const err = $('#foodError');
+    const name = $('#foodName').value.trim().replace(/\s+/g, ' ') || 'Senza nome';
+    const kcal = parseKcal($('#foodKcal').value);
+    const gRaw = $('#foodGrams').value.trim();
+    const grams = gRaw === '' ? null : parseDec(gRaw);
+    if (grams !== null && (!Number.isFinite(grams) || grams <= 0 || grams > 5000)) {
+      err.textContent = 'I grammi devono essere un numero tra 0 e 5.000, oppure lascia il campo vuoto.';
+      err.hidden = false; $('#foodGrams').focus(); return;
+    }
+    if (!Number.isFinite(kcal) || kcal < 0 || kcal > 10000) {
+      err.textContent = 'Inserisci le kcal del cibo: un numero da 0 a 10.000.';
+      err.hidden = false; $('#foodKcal').focus(); return;
+    }
+    err.hidden = true;
+    const d = ensureDay(sel);
+    if (editId) {
+      const f = d.foods.find((x) => x.id === editId);
+      const meal = $('#foodMeal').value;
+      if (f) { f.name = name; f.grams = cleanGrams(grams); f.kcal = kcal; f.meal = MEAL_KEYS.includes(meal) ? meal : f.meal; activeMeal = f.meal; }
+      save();
+      exitEdit(false);
+      render();
+      toast('Modifica salvata.');
+    } else {
+      d.foods.push({ id: uid(), name, grams: cleanGrams(grams), kcal, meal: activeMeal });
+      save();
+      clearForm();
+      render();
+      $('#foodName').focus();
+    }
+  });
+  $('#foodCancel').addEventListener('click', () => exitEdit());
+
+  $('#meals').addEventListener('click', (e) => {
+    const add = e.target.closest('[data-add]');
+    if (add) {
+      if (editId) exitEdit(false);
+      activeMeal = add.dataset.add;
+      saveFor = null;
+      render();
+      $('#foodName').focus();
+      return;
+    }
+    const sv = e.target.closest('[data-save]');
+    if (sv) {
+      saveFor = sv.dataset.save;
+      const items = dayOf(sel).foods.filter((f) => f.meal === saveFor);
+      $('#saveName').value = suggestMealName(items);
+      render();
+      $('#saveName').focus();
+      $('#saveName').select();
+      return;
+    }
+    const li = e.target.closest('.food');
+    if (!li) return;
+    const d = ensureDay(sel);
+    const idx = d.foods.findIndex((x) => x.id === li.dataset.id);
+    if (idx < 0) return;
+    if (e.target.closest('.food-del')) {
+      const [removed] = d.foods.splice(idx, 1);
+      if (editId === removed.id) exitEdit(false);
+      prune(sel); save(); render();
+      const k = sel;
+      toast(`Eliminato: ${removed.name}.`, () => { ensureDay(k).foods.splice(idx, 0, removed); save(); render(); });
+    } else if (e.target.closest('.food-edit')) {
+      const f = d.foods[idx];
+      clearForm();
+      editId = f.id;
+      activeMeal = f.meal;
+      saveFor = null;
+      $('#foodName').value = f.name;
+      $('#foodGrams').value = f.grams ? fmtG(f.grams) : '';
+      $('#foodKcal').value = f.kcal;
+      // se cambi i grammi, le kcal si ricalcolano in proporzione
+      libRatio = f.grams ? f.kcal / f.grams : null;
+      kcalAuto = !!f.grams;
+      $('#foodMeal').value = f.meal;
+      $('#foodSubmit').textContent = 'Salva';
+      $('#editExtras').hidden = false;
+      render();
+      $(f.grams ? '#foodGrams' : '#foodKcal').focus();
+    }
+  });
+
+  $('#chips').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    const item = chipCache[+b.dataset.i];
+    if (!item) return;
+    const undo = addItems(sel, activeMeal, [item]);
+    toast(`Aggiunto a ${mealLabel(activeMeal).toLowerCase()}: ${item.name}, ${fmt(item.kcal)} kcal.`, undo);
+  });
+
+  $('#savedChips').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    const meal = savedCache[+b.dataset.i];
+    if (!meal) return;
+    const undo = addItems(sel, activeMeal, meal.items);
+    toast(`Aggiunto ${meal.name}: ${meal.items.length} ${meal.items.length === 1 ? 'cibo' : 'cibi'}, ${fmt(sumKcal(meal.items))} kcal.`, undo);
+  });
+
+  $('#saveForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!saveFor) return;
+    const items = dayOf(sel).foods.filter((f) => f.meal === saveFor).map(cleanItem);
+    if (!items.length) { saveFor = null; render(); return; }
+    const name = $('#saveName').value.trim().replace(/\s+/g, ' ').slice(0, 60) || suggestMealName(items);
+    const existing = state.meals.findIndex((m) => m.name.toLowerCase() === name.toLowerCase());
+    const meal = { id: existing >= 0 ? state.meals[existing].id : uid(), name, slot: saveFor, items };
+    if (existing >= 0) state.meals[existing] = meal; else state.meals.push(meal);
+    saveFor = null;
+    save(); render();
+    toast(existing >= 0 ? `Pasto aggiornato: ${name}.` : `Pasto salvato: ${name}, ${fmt(sumKcal(items))} kcal.`);
+  });
+  $('#saveCancel').addEventListener('click', () => { saveFor = null; render(); });
+
+  $('#burnForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (setBurned(sel, $('#burnInput').value)) $('#burnInput').blur();
+  });
+
+  $('#bannerForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!bannerKey) return;
+    const input = $('#bannerInput');
+    if (input.value.trim() === '') { input.focus(); return; }
+    if (setBurned(bannerKey, input.value)) { input.value = ''; input.blur(); }
+  });
+  $('#bannerMore').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-goto]');
+    if (b) goDay(b.dataset.goto, true);
+  });
+
+  /* ---------- eventi: calendario ---------- */
+  $('#calGrid').addEventListener('click', (e) => {
+    const c = e.target.closest('.cell[data-k]');
+    if (c && !c.disabled) goDay(c.dataset.k);
+  });
+  $('#prevMonth').addEventListener('click', () => { calM--; if (calM < 0) { calM = 11; calY--; } render(); });
+  $('#nextMonth').addEventListener('click', () => { calM++; if (calM > 11) { calM = 0; calY++; } render(); });
+
+  /* ---------- eventi: impostazioni ---------- */
+  $('#setForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const err = $('#setError');
+    const goal = parseKcal($('#setGoal').value);
+    const start = $('#setStart').value;
+    if (!Number.isFinite(goal) || goal < 1000 || goal > 500000) {
+      err.textContent = 'L’obiettivo deve essere un numero tra 1.000 e 500.000 kcal.'; err.hidden = false; return;
+    }
+    if (!isKey(start)) { err.textContent = 'Scegli una data di inizio valida.'; err.hidden = false; return; }
+    err.hidden = true;
+    state.goal = goal;
+    state.start = start;
+    if (sel < minKey()) sel = minKey();
+    save();
+    $('#bar').innerHTML = '';
+    render();
+    toast('Impostazioni salvate.');
+  });
+
+  $('#savedList').addEventListener('click', (e) => {
+    const b = e.target.closest('.food-del');
+    if (!b) return;
+    const id = b.closest('li').dataset.id;
+    const idx = state.meals.findIndex((m) => m.id === id);
+    if (idx < 0) return;
+    const [removed] = state.meals.splice(idx, 1);
+    save(); render();
+    toast(`Pasto eliminato: ${removed.name}.`, () => { state.meals.splice(idx, 0, removed); save(); render(); });
+  });
+
+  $('#exportBtn').addEventListener('click', async () => {
+    const t = todayKey();
+    const data = JSON.stringify(state, null, 1);
+    const name = `deficit-backup-${t}.json`;
+    const done = () => { state.lastBackup = t; save(); render(); toast('Backup esportato.'); };
+    try {
+      const file = new File([data], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Backup deficit calorico' });
+        done();
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    done();
+  });
+
+  $('#importInput').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const parsed = sanitize(JSON.parse(await file.text()));
+      if (!parsed) throw new Error('formato');
+      const prev = state;
+      state = parsed;
+      save();
+      sel = todayKey();
+      $('#bar').innerHTML = '';
+      render();
+      const n = Object.keys(state.days).length;
+      toast(`Backup importato: ${n} ${n === 1 ? 'giorno' : 'giorni'}.`, () => { state = prev; save(); $('#bar').innerHTML = ''; render(); });
+    } catch (err) {
+      toast('File non valido: scegli un backup esportato da questa app.');
+    }
+  });
+
+  $('#resetBtn').addEventListener('click', (e) => {
+    const b = e.currentTarget;
+    if (!resetArmed) {
+      b.classList.add('armed');
+      b.textContent = 'Tocca di nuovo per cancellare tutto';
+      resetArmed = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Cancella tutti i dati'; resetArmed = null; }, 4000);
+      return;
+    }
+    clearTimeout(resetArmed); resetArmed = null;
+    b.classList.remove('armed'); b.textContent = 'Cancella tutti i dati';
+    state = defaults();
+    save();
+    sel = todayKey();
+    $('#bar').innerHTML = '';
+    render();
+    toast('Tutti i dati sono stati cancellati.');
+  });
+
+  /* ---------- navigazione ---------- */
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.view === 'cal' && view !== 'cal') {
+      const d = parseKey(sel); calY = d.getFullYear(); calM = d.getMonth();
+    }
+    show(b.dataset.view);
+  }));
+
+  // cambio di giorno con l'app aperta o riaperta il mattino dopo
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const t = todayKey();
+    if (t !== lastToday) {
+      if (sel === lastToday) sel = t;
+      lastToday = t;
+      renderedSel = null;
+      render();
+    }
+  });
+
+  /* ---------- avvio ---------- */
+  render();
+  setTimeout(() => $('#bar').classList.add('settled'), 1600);
+
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
